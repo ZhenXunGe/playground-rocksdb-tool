@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-clap = { version = "4.5.9", features = ["derive"] }
-hex = "0.4.3"
+clap = { version = "3.2.22", features = ["derive"] }
+hex = "0.4"
 rocksdb = "0.21.0"
+zkwasm-host-circuits = { git = "https://github.com/DelphinusLab/zkWasm-host-circuits.git", branch = "host-op-1.9" }
+
+[features]
+cuda = ["zkwasm-host-circuits/cuda"]

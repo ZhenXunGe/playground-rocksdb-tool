@@ -1,6 +1,7 @@
 use clap::{Parser, Subcommand};
 use hex;
 use std::path::PathBuf;
+use zkwasm_host_circuits::host::{datahash::DataHashRecord, mongomerkle::MerkleRecord};
 
 #[derive(Parser)]
 #[clap(author, version, about = "CLI tool to check RocksDB key-value pairs")]
@@ -17,9 +18,9 @@ enum Commands {
         #[clap(short, long)]
         db_path: PathBuf,
 
-        /// Optional rocksdb column family name, will use default if not provided
+        /// Target column family to look up in the database, should either be "merkle_records" or "data_records"
         #[clap(short, long)]
-        cf_name: Option<String>,
+        target_cf: String,
 
         /// Key to look up in the database (hex string like "0A1B2C" or array format like "[10,27,44]")
         #[clap(short, long)]
@@ -28,8 +29,8 @@ enum Commands {
 }
 
 /// Opens a RocksDB database in read-only mode
-fn create_read_only_db_handler(rocksdb_path: PathBuf) -> rocksdb::DB {
-    rocksdb::DB::open_for_read_only(&rocksdb::Options::default(), rocksdb_path, false)
+fn create_read_only_db_handler(rocksdb_path: PathBuf, cf_names: Vec<&str>) -> rocksdb::DB {
+    rocksdb::DB::open_cf_for_read_only(&rocksdb::Options::default(), rocksdb_path, cf_names, false)
         .expect("Should be able to open db")
 }
 
@@ -101,8 +102,8 @@ fn parse_key(key_str: &str) -> Result<Vec<u8>, String> {
     }
 }
 
-/// Default to merkle records column family if not provided
-const DEFAULT_CF_NAME: &str = "merkle_records";
+const MERKLE_CF_NAME: &str = "merkle_records";
+const DATA_CF_NAME: &str = "data_records";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
@@ -110,7 +111,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     match &cli.command {
         Commands::CheckRocksDb {
             db_path,
-            cf_name,
+            target_cf,
             key,
         } => {
             println!("Checking RocksDB at path: {:?}", db_path);
@@ -121,15 +122,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 e
             })?;
 
-            // Get the column family name
-            let cf_name = cf_name.as_deref().unwrap_or(DEFAULT_CF_NAME);
-            println!("Using column family: {}", cf_name);
-
             println!("Looking for key (bytes): {:?}", key_bytes);
-
+            let cf_names = vec![MERKLE_CF_NAME, DATA_CF_NAME];
             // Open the database
-            let db = create_read_only_db_handler(db_path.clone());
-            let cf = db.cf_handle(cf_name).expect("Column family not found");
+            let db = create_read_only_db_handler(db_path.clone(), cf_names);
+
+            let cf = db
+                .cf_handle(target_cf)
+                .expect("Should be able to get cf handle");
             // Try to get the value
             match db.get_cf(cf, &key_bytes) {
                 Ok(Some(value)) => {
@@ -137,7 +137,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("Value (bytes): {:?}", value);
 
                     // Try to display the value in different formats for convenience
-                    println!("Value (hex): {}", hex::encode(&value));
+                    if target_cf == MERKLE_CF_NAME {
+                        let record = MerkleRecord::from_slice(&value)?;
+                        println!("Value (as MerkleRecord): {:?}", record);
+                    }
+
+                    if target_cf == DATA_CF_NAME {
+                        let record = DataHashRecord::from_slice(&value)?;
+                        println!("Value (as DataRecord): {:?}", record);
+                    }
 
                     // Try to interpret as u32 or u64 if appropriate length
                     if value.len() == 4 {
