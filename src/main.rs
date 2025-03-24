@@ -26,6 +26,15 @@ enum Commands {
         #[clap(short, long)]
         key: String,
     },
+    CountRocksDb {
+        /// Path to the RocksDB database directory
+        #[clap(short, long)]
+        db_path: PathBuf,
+
+        /// Target column family to look up in the database, should either be "merkle_records" or "data_records"
+        #[clap(short, long)]
+        target_cf: String,
+    },
 }
 
 /// Opens a RocksDB database in read-only mode
@@ -177,7 +186,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     )));
                 }
             }
-        }
+        },
+        Commands::CountRocksDb { db_path, target_cf } => {
+            println!("Counting RocksDB at path: {:?}", db_path);
+
+            let cf_names = vec![MERKLE_CF_NAME, DATA_CF_NAME];
+            // Open the database
+            let db = create_read_only_db_handler(db_path.clone(), cf_names);
+
+            let cf = db
+                .cf_handle(target_cf)
+                .expect("Should be able to get cf handle");
+
+            let iter = db.iterator_cf(cf, rocksdb::IteratorMode::Start);
+            
+            let count = iter.count();
+
+            println!("Total number of records in column family '{}': {}", target_cf, count);
+        },
     }
 
     Ok(())
