@@ -7,7 +7,8 @@ edition = "2021"
 clap = { version = "3.2.22", features = ["derive"] }
 hex = "0.4"
 rocksdb = "0.21.0"
-zkwasm-host-circuits = { git = "https://github.com/DelphinusLab/zkWasm-host-circuits.git", branch = "host-op-1.9" }
+zkwasm-host-circuits = { git = "https://github.com/DelphinusLab/zkWasm-host-circuits.git", branch = "yyu/zkwas-549-RefineOptionsForCF" }
+anyhow = "1.0.98"
 
 [features]
 cuda = ["zkwasm-host-circuits/cuda"]

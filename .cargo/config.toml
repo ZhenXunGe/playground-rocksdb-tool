@@ -1,0 +1,4 @@
+[alias]
+lint = "clippy --no-deps -- -Dwarnings"
+lint_tests = "clippy --tests -- -Dwarnings"
+release = "build --release"
