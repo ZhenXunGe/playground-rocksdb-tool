@@ -42,13 +42,17 @@ enum Commands {
         target_cf: String,
     },
     FlushAndCompact {
-        /// Path to the RocksDB database directory.
-        #[clap(short, long)]
-        db_path: PathBuf,
+        /// Path to the RocksDB database workspace.
+        #[clap(short, long, required = true)]
+        workspace: PathBuf,
 
         /// List of image md5s to flush and compact.
+        #[clap(short, long, required = true, multiple_values = true)]
+        md5_list: Vec<String>,
+
+        /// Print detailed output during running.
         #[clap(short, long)]
-        md5s: Vec<String>,
+        verbose: bool,
     },
 }
 
@@ -203,11 +207,36 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             println!("Total number of records in column family '{}': {}", target_cf, count);
         }
-        Commands::FlushAndCompact { db_path, md5s } => {
-            println!("Flushing and Compacting {md5s:?} at RocksDB path: {db_path:?}");
-            todo!()
+        Commands::FlushAndCompact {
+            workspace,
+            md5_list,
+            verbose,
+        } => {
+            println!("\nRunning `flush-and-compact`\n\tRocksDB workspace: {workspace:?}\n\tMD5 list:\n\t{md5_list:?}");
+            for md5 in md5_list.iter().map(utils::CaseInsensitiveMD5::new) {
+                println!("\n{md5}:");
+                utils::print_dir_contents(workspace, &md5, *verbose)?;
+
+                let start = std::time::Instant::now();
+                {
+                    let handler = utils::RocksDBHandler::create_db_handler(workspace, &md5, false).map_err(|e| {
+                        anyhow::anyhow!(
+                            "Error {e}, RocksDB handler must be available in write mode, stop the dry run server"
+                        )
+                    })?;
+
+                    println!("\tFlushing ...");
+                    handler.flush().map_err(|e| anyhow::anyhow!("Failed flush: {e}"))?;
+                    println!("\tCompacting ...");
+                    handler.compact().map_err(|e| anyhow::anyhow!("Failed compact: {e}"))?;
+                }
+                let dur = start.elapsed().as_secs_f64();
+
+                utils::delete_old_logs(workspace, &md5)?;
+                println!("\tFinished flush and compact, took {dur:.6} seconds");
+                utils::print_dir_contents(workspace, &md5, *verbose)?;
+            }
         }
     }
-
     Ok(())
 }

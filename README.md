@@ -6,9 +6,9 @@
 
 requires
 
-- --db-path: path to rocksdb directory
-- --key: key to query. This should be wrapped by quotes as a string.
-- --target-cf: target column family to query, either `merkle_records` or `data_records`
+- `--db-path`: path to rocksdb directory
+- `--key`: key to query. This should be wrapped by quotes as a string.
+- `--target-cf`: target column family to query, either `merkle_records` or `data_records`
 
 ```bash
 cargo run --release check-rocks-db --db-path /tmp/rocksdb --target-cf merkle_records --key "[1, 2, 3] OR 0x1234567890abcdef"
@@ -20,9 +20,30 @@ As our hash key is 256 bits, so just need make sure if inputs is "[1, 2, 3, 4]",
 
 requires
 
-- --db-path: path to rocksdb directory
-- --target-cf: target column family to query, either `merkle_records` or `data_records`
+- `--db-path`: path to rocksdb directory
+- `--target-cf`: target column family to query, either `merkle_records` or `data_records`
 
 ```bash
 cargo run --release count-rocks-db --db-path /tmp/rocksdb --target-cf merkle_records
+```
+
+### Flush and Compact specific images `RocksDB`
+
+requires
+
+- `--workspace`: path to `RocksDB` workspace folder.
+- `--md5-list`: list of image md5s to perform flush and compact on.
+- `--verbose`: if specified, prints additional directory information to stdout during running.
+
+```bash
+cargo run --release flush-and-compact --workspace /tmp/rocksdb --md5-list D2144252F3C9DDCA5CA86C23D2EE97E9 6C17A53119CE7FAAD838C22232FBF61A --verbose
+```
+
+## Developer Pre-Commit Guide
+
+Developers are recommended to run the following format and lint commands before committing:
+
+```bash
+cargo fmt
+cargo lint
 ```
