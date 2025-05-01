@@ -39,6 +39,16 @@ requires
 cargo run --release flush-and-compact --workspace /tmp/rocksdb --md5-list D2144252F3C9DDCA5CA86C23D2EE97E9 6C17A53119CE7FAAD838C22232FBF61A --verbose
 ```
 
+#### Example: Flush and Compact every image's DB within `RocksDB` workspace
+
+Please see the following [script](scripts/flush_and_compact_all_dbs.sh)
+
+Usage:
+
+```bash
+bash scripts/flush_and_compact_all_dbs.sh /dir/to/rocksdb/workspace
+```
+
 ## Developer Pre-Commit Guide
 
 Developers are recommended to run the following format and lint commands before committing:
