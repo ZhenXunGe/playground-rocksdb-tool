@@ -1,0 +1,5 @@
+imports_granularity = "Item"
+max_width = 120
+fn_call_width = 80
+chain_width = 80
+struct_lit_width = 20
