@@ -5,10 +5,10 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "3.2.22", features = ["derive"] }
-hex = "0.4"
+hex = "0.4.3"
 rocksdb = "0.21.0"
 zkwasm-host-circuits = { git = "https://github.com/DelphinusLab/zkWasm-host-circuits.git", branch = "yyu/zkwas-549-RefineOptionsForCF" }
-anyhow = "1.0.98"
+anyhow = "1.0.86"
 
 [features]
 cuda = ["zkwasm-host-circuits/cuda"]
