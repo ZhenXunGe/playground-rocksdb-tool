@@ -215,7 +215,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("\nRunning `flush-and-compact`\n\tRocksDB workspace: {workspace:?}\n\tMD5 list:\n\t{md5_list:?}");
             for md5 in md5_list.iter().map(utils::CaseInsensitiveMD5::new) {
                 println!("\n{md5}:");
-                utils::print_dir_contents(workspace, &md5, *verbose)?;
+                utils::print_dir_contents(workspace, &md5, true, *verbose)?;
 
                 let start = std::time::Instant::now();
                 {
@@ -234,7 +234,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 utils::delete_old_logs(workspace, &md5)?;
                 println!("\tFinished flush and compact, took {dur:.6} seconds");
-                utils::print_dir_contents(workspace, &md5, *verbose)?;
+                utils::print_dir_contents(workspace, &md5, false, *verbose)?;
             }
         }
     }

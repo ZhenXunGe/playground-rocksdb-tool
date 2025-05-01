@@ -70,9 +70,16 @@ pub fn delete_old_logs(workspace: &Path, md5: &CaseInsensitiveMD5) -> std::io::R
     Ok(())
 }
 
-pub fn print_dir_contents(workspace: &Path, md5: &CaseInsensitiveMD5, verbose: bool) -> anyhow::Result<()> {
+pub fn print_dir_contents(
+    workspace: &Path,
+    md5: &CaseInsensitiveMD5,
+    print_path: bool,
+    verbose: bool,
+) -> anyhow::Result<()> {
     let dir = get_hex_split_md5_workspace_path(workspace, md5);
-    println!("\tDirectory: {}", dir.display());
+    if print_path {
+        println!("\tDirectory: {}", dir.display());
+    }
     if !dir.exists() {
         return Err(anyhow::anyhow!("Directory doesn't exist {dir:?}"));
     }
