@@ -1,7 +1,13 @@
-use clap::{Parser, Subcommand};
-use hex;
+use clap::Parser;
+use clap::Subcommand;
+use constants::DATA_CF_NAME;
+use constants::MERKLE_CF_NAME;
 use std::path::PathBuf;
-use zkwasm_host_circuits::host::{datahash::DataHashRecord, mongomerkle::MerkleRecord};
+use zkwasm_host_circuits::host::datahash::DataHashRecord;
+use zkwasm_host_circuits::host::mongomerkle::MerkleRecord;
+
+mod constants;
+mod utils;
 
 #[derive(Parser)]
 #[clap(author, version, about = "CLI tool to check RocksDB key-value pairs")]
@@ -34,6 +40,19 @@ enum Commands {
         /// Target column family to look up in the database, should either be "merkle_records" or "data_records"
         #[clap(short, long)]
         target_cf: String,
+    },
+    FlushAndCompact {
+        /// Path to the RocksDB database workspace.
+        #[clap(short, long, required = true)]
+        workspace: PathBuf,
+
+        /// List of image md5s to flush and compact.
+        #[clap(short, long, required = true, multiple_values = true)]
+        md5_list: Vec<String>,
+
+        /// Print detailed output during running.
+        #[clap(short, long)]
+        verbose: bool,
     },
 }
 
@@ -78,41 +97,30 @@ fn parse_key(key_str: &str) -> Result<Vec<u8>, String> {
         }
 
         // Parse as regular u8 array
-        let values: Result<Vec<u8>, _> = contents
-            .split(',')
-            .map(|s| s.trim().parse::<u8>())
-            .collect();
+        let values: Result<Vec<u8>, _> = contents.split(',').map(|s| s.trim().parse::<u8>()).collect();
 
         values.map_err(|e| format!("Failed to parse array format: {}", e))
     } else {
         // Parse hex string format
-        let hex_str = if key_str.starts_with("0x") {
+        let hex_str = if let Some(stripped) = key_str.strip_prefix("0x") {
             // Remove "0x" prefix
-            &key_str[2..]
+            stripped
         } else {
             key_str
         };
 
-        let bytes =
-            hex::decode(hex_str).map_err(|e| format!("Failed to parse hex string: {}", e))?;
+        let bytes = hex::decode(hex_str).map_err(|e| format!("Failed to parse hex string: {}", e))?;
 
         // If the byte length is 32, check if this might be a [u8; 32] or [u64; 4]
         if bytes.len() == 32 {
             println!("Detected 32-byte key (compatible with [u8; 32] or [u64; 4])");
-        } else if bytes.len() % 8 == 0 && bytes.len() > 0 {
-            println!(
-                "Detected {}-byte key ({} u64 values)",
-                bytes.len(),
-                bytes.len() / 8
-            );
+        } else if bytes.len() % 8 == 0 && !bytes.is_empty() {
+            println!("Detected {}-byte key ({} u64 values)", bytes.len(), bytes.len() / 8);
         }
 
         Ok(bytes)
     }
 }
-
-const MERKLE_CF_NAME: &str = "merkle_records";
-const DATA_CF_NAME: &str = "data_records";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
@@ -136,9 +144,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Open the database
             let db = create_read_only_db_handler(db_path.clone(), cf_names);
 
-            let cf = db
-                .cf_handle(target_cf)
-                .expect("Should be able to get cf handle");
+            let cf = db.cf_handle(target_cf).expect("Should be able to get cf handle");
             // Try to get the value
             match db.get_cf(cf, &key_bytes) {
                 Ok(Some(value)) => {
@@ -163,8 +169,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     if value.len() == 8 {
                         let val_u64 = u64::from_le_bytes([
-                            value[0], value[1], value[2], value[3], value[4], value[5], value[6],
-                            value[7],
+                            value[0], value[1], value[2], value[3], value[4], value[5], value[6], value[7],
                         ]);
                         println!("Value (as u64, little-endian): {}", val_u64);
                     }
@@ -186,7 +191,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     )));
                 }
             }
-        },
+        }
         Commands::CountRocksDb { db_path, target_cf } => {
             println!("Counting RocksDB at path: {:?}", db_path);
 
@@ -194,17 +199,44 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             // Open the database
             let db = create_read_only_db_handler(db_path.clone(), cf_names);
 
-            let cf = db
-                .cf_handle(target_cf)
-                .expect("Should be able to get cf handle");
+            let cf = db.cf_handle(target_cf).expect("Should be able to get cf handle");
 
             let iter = db.iterator_cf(cf, rocksdb::IteratorMode::Start);
-            
+
             let count = iter.count();
 
             println!("Total number of records in column family '{}': {}", target_cf, count);
-        },
-    }
+        }
+        Commands::FlushAndCompact {
+            workspace,
+            md5_list,
+            verbose,
+        } => {
+            println!("\nRunning `flush-and-compact`\n\tRocksDB workspace: {workspace:?}\n\tMD5 list:\n\t{md5_list:?}");
+            for md5 in md5_list.iter().map(utils::CaseInsensitiveMD5::new) {
+                println!("\n{md5}:");
+                utils::print_dir_contents(workspace, &md5, true, *verbose)?;
 
+                let start = std::time::Instant::now();
+                {
+                    let handler = utils::RocksDBHandler::create_db_handler(workspace, &md5, false).map_err(|e| {
+                        anyhow::anyhow!(
+                            "Error {e}, RocksDB handler must be available in write mode, stop the dry run server"
+                        )
+                    })?;
+
+                    println!("\tFlushing ...");
+                    handler.flush().map_err(|e| anyhow::anyhow!("Failed flush: {e}"))?;
+                    println!("\tCompacting ...");
+                    handler.compact().map_err(|e| anyhow::anyhow!("Failed compact: {e}"))?;
+                }
+                let dur = start.elapsed().as_secs_f64();
+
+                utils::delete_old_logs(workspace, &md5)?;
+                println!("\tFinished flush and compact, took {dur:.6} seconds");
+                utils::print_dir_contents(workspace, &md5, false, *verbose)?;
+            }
+        }
+    }
     Ok(())
 }

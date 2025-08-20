@@ -62,9 +62,9 @@ dependencies = [
 
 [[package]]
 name = "anyhow"
-version = "1.0.97"
+version = "1.0.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dcfed56ad506cb2c684a14971b8861fdc3baaaae314b9e5f9bb532cbe3ba7a4f"
+checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
 
 [[package]]
 name = "ark-ff"
@@ -1956,6 +1956,7 @@ checksum = "7edddbd0b52d732b21ad9a5fab5c704c14cd949e5e9a1ec5929a24fded1b904c"
 name = "playground-rocksdb-tool"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "clap",
  "hex",
  "rocksdb",
@@ -3501,7 +3502,7 @@ dependencies = [
 [[package]]
 name = "zkwasm-host-circuits"
 version = "0.1.0"
-source = "git+https://github.com/DelphinusLab/zkWasm-host-circuits.git?branch=host-op-1.9#0c7b6103fd1f5e1a044dbf3b43362c1a12952424"
+source = "git+https://github.com/DelphinusLab/zkWasm-host-circuits.git?branch=yyu/zkwas-549-RefineOptionsForCF#18bd1191e4a49292fd954489b8a9fdd758902566"
 dependencies = [
  "anyhow",
  "ark-std",
